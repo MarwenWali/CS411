@@ -1,0 +1,16 @@
+import { useEffect, useState } from 'react'
+import { getComponents } from '../api/components'
+import { getMachines } from '../api/machines'
+import { useAuth } from '../context/AuthContext'
+import StatusBadge from '../components/StatusBadge'
+import LoadingState from '../components/LoadingState'
+import { Link } from 'react-router-dom'
+
+export default function Dashboard() {
+  const { user } = useAuth(); const [components, setComponents] = useState([]); const [machines, setMachines] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
+  useEffect(() => { Promise.all([getComponents(), getMachines()]).then(([c, m]) => { setComponents(c); setMachines(m) }).catch((err) => setError(err.message)).finally(() => setLoading(false)) }, [])
+  if (loading) return <PageIntro eyebrow="WORKSHOP PULSE" title={`Good morning, ${user.name.split(' ')[0]}.`}><LoadingState /></PageIntro>
+  return <PageIntro eyebrow="WORKSHOP PULSE" title={`Good morning, ${user.name.split(' ')[0]}.`} subtitle="A live view of what is ready for the next build."><div className="metric-row"><Metric value={components.length} label="Components" detail={`${components.filter((item) => item.status === 'available').length} available`} /><Metric value={machines.length} label="Machines" detail={`${machines.filter((item) => item.status === 'available').length} ready to use`} /><Metric value={components.filter((item) => item.status !== 'available').length + machines.filter((item) => item.status !== 'available').length} label="Attention" detail="Items unavailable" /></div>{error && <div className="alert error">{error}</div>}<div className="section-heading"><div><span className="eyebrow">INVENTORY</span><h3>Shared resources</h3></div>{user.role === 'student' && <Link to="/book" className="text-link">Start a booking →</Link>}</div><div className="resource-grid">{[...components.map((item) => ({ ...item, kind: 'Component' })), ...machines.map((item) => ({ ...item, kind: 'Machine' }))].map((item) => <div className={`resource-card ${item.status !== 'available' ? 'unavailable' : ''}`} key={`${item.kind}-${item.id}`}><div className="resource-top"><span className="resource-kind">{item.kind}</span><StatusBadge status={item.status} /></div><h4>{item.name}</h4><p>{item.kind === 'Component' ? `${item.quantity} units in stock` : item.requires_instructor ? 'Instructor supervision required' : 'Open workshop machine'}</p>{user.role === 'student' && <Link className={`small-button ${item.status !== 'available' ? 'disabled' : ''}`} to={item.status === 'available' ? `/book?type=${item.kind.toLowerCase()}&id=${item.id}` : '/dashboard'} onClick={(event) => item.status !== 'available' && event.preventDefault()}>{item.status === 'available' ? 'Book resource' : 'Unavailable'}</Link>}</div>)}</div></PageIntro>
+}
+export function PageIntro({ eyebrow, title, subtitle, children }) { return <><div className="page-intro"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div></div>{children}</> }
+function Metric({ value, label, detail }) { return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div> }
